@@ -9,6 +9,9 @@ const SYMBOL_NAMES: Record<string, string> = {
   BNBUSDT: "BNB",
   XRPUSDT: "XRP",
   DOGEUSDT: "Dogecoin",
+  ADAUSDT: "Cardano",
+  AVAXUSDT: "Avalanche",
+  LINKUSDT: "Chainlink",
 };
 
 function formatPrice(price: number): string {
