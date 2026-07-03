@@ -1,9 +1,7 @@
 package dev.eminberkeay.financepulse.binance;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.eminberkeay.financepulse.market.PriceStore;
-import dev.eminberkeay.financepulse.market.Ticker;
 import dev.eminberkeay.financepulse.ws.PriceBroadcastHandler;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -34,6 +32,7 @@ public class BinanceStreamClient implements WebSocket.Listener {
 
     private final PriceStore priceStore;
     private final PriceBroadcastHandler broadcastHandler;
+    private final TickerMapper tickerMapper;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ScheduledExecutorService reconnectExecutor = Executors.newSingleThreadScheduledExecutor();
     private final StringBuilder messageBuffer = new StringBuilder();
@@ -44,9 +43,11 @@ public class BinanceStreamClient implements WebSocket.Listener {
 
     public BinanceStreamClient(PriceStore priceStore,
                                PriceBroadcastHandler broadcastHandler,
+                               TickerMapper tickerMapper,
                                @Value("${financepulse.symbols:btcusdt,ethusdt,solusdt,bnbusdt,xrpusdt,dogeusdt}") List<String> symbols) {
         this.priceStore = priceStore;
         this.broadcastHandler = broadcastHandler;
+        this.tickerMapper = tickerMapper;
         this.symbols = symbols;
     }
 
@@ -84,30 +85,14 @@ public class BinanceStreamClient implements WebSocket.Listener {
     }
 
     private void handleMessage(String json) {
-        try {
-            JsonNode payload = objectMapper.readTree(json).path("data");
-            if (!payload.has("s")) {
-                return;
+        tickerMapper.fromCombinedStream(json).ifPresent(ticker -> {
+            try {
+                priceStore.update(ticker);
+                broadcastHandler.broadcast(objectMapper.writeValueAsString(ticker));
+            } catch (Exception e) {
+                log.warn("Failed to broadcast ticker: {}", e.getMessage());
             }
-            double open = payload.path("o").asDouble();
-            double close = payload.path("c").asDouble();
-            double changePercent = open == 0 ? 0 : (close - open) / open * 100;
-
-            Ticker ticker = new Ticker(
-                    payload.path("s").asText(),
-                    close,
-                    open,
-                    payload.path("h").asDouble(),
-                    payload.path("l").asDouble(),
-                    payload.path("v").asDouble(),
-                    changePercent,
-                    payload.path("E").asLong()
-            );
-            priceStore.update(ticker);
-            broadcastHandler.broadcast(objectMapper.writeValueAsString(ticker));
-        } catch (Exception e) {
-            log.warn("Failed to process Binance message: {}", e.getMessage());
-        }
+        });
     }
 
     @Override
