@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PricePoint, Ticker } from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 const WS_URL = API_URL.replace(/^http/, "ws") + "/ws/prices";
-const MAX_HISTORY = 120;
+const MAX_HISTORY = 240;
 
 export type ConnectionState = "connecting" | "connected" | "disconnected";
 
@@ -14,6 +14,24 @@ export function usePrices() {
   const [history, setHistory] = useState<Record<string, PricePoint[]>>({});
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadedHistory = useRef<Set<string>>(new Set());
+
+  // Seed the chart with recent 1-minute candles so it isn't empty on first view.
+  const loadHistory = useCallback(async (symbol: string) => {
+    if (loadedHistory.current.has(symbol)) return;
+    loadedHistory.current.add(symbol);
+    try {
+      const res = await fetch(`${API_URL}/api/history/${symbol}?limit=60`);
+      if (!res.ok) throw new Error(res.statusText);
+      const seed: PricePoint[] = await res.json();
+      setHistory((prev) => ({
+        ...prev,
+        [symbol]: [...seed, ...(prev[symbol] ?? [])].slice(-MAX_HISTORY),
+      }));
+    } catch {
+      loadedHistory.current.delete(symbol);
+    }
+  }, []);
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -63,5 +81,5 @@ export function usePrices() {
     };
   }, []);
 
-  return { tickers, history, connection };
+  return { tickers, history, connection, loadHistory };
 }
