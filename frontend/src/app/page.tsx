@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import AlertPanel from "@/components/AlertPanel";
 import LiveChart from "@/components/LiveChart";
 import PriceCard from "@/components/PriceCard";
+import { useAlerts } from "@/hooks/useAlerts";
 import { usePrices } from "@/hooks/usePrices";
 
 const CONNECTION_LABELS = {
@@ -12,8 +14,17 @@ const CONNECTION_LABELS = {
 } as const;
 
 export default function Home() {
-  const { tickers, history, connection } = usePrices();
+  const { tickers, history, connection, loadHistory } = usePrices();
+  const { alerts, addAlert, removeAlert, evaluate } = useAlerts();
   const [selected, setSelected] = useState("BTCUSDT");
+
+  useEffect(() => {
+    loadHistory(selected);
+  }, [selected, loadHistory]);
+
+  useEffect(() => {
+    evaluate(tickers);
+  }, [tickers, evaluate]);
 
   const sorted = Object.values(tickers).sort((a, b) =>
     a.symbol.localeCompare(b.symbol),
@@ -60,6 +71,14 @@ export default function Home() {
               points={history[selected] ?? []}
               up={(selectedTicker?.changePercent ?? 0) >= 0}
             />
+            <div className="mt-6">
+              <AlertPanel
+                symbols={sorted.map((t) => t.symbol)}
+                alerts={alerts}
+                onAdd={addAlert}
+                onRemove={removeAlert}
+              />
+            </div>
           </>
         )}
       </div>

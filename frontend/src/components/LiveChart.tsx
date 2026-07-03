@@ -63,8 +63,8 @@ export default function LiveChart({ symbol, points, up }: Props) {
               borderRadius: 8,
               color: "#fafafa",
             }}
-            labelFormatter={(t: number) => new Date(t).toLocaleTimeString()}
-            formatter={(value: number) => [`$${value.toLocaleString("en-US")}`, "Price"]}
+            labelFormatter={(t) => new Date(Number(t)).toLocaleTimeString()}
+            formatter={(value) => [`$${Number(value).toLocaleString("en-US")}`, "Price"]}
           />
           <Area
             type="monotone"
